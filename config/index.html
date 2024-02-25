@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BioDWH2 Config</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg bg-body-tertiary">
+      <div class="container-fluid">
+        <span>
+          <img src="assets/BioDWH2-logo.svg" alt="Logo" height="36" class="d-inline-block">
+          &nbsp;|&nbsp;Config
+        </span>
+      </div>
+    </nav>
+    <div class="container-fluid mt-4">
+      <div class="row justify-content-center">
+        <div class="col-6">
+          <div class="input-group mb-3">
+            <span class="input-group-text" id="endpoint-label" style="width: 100px;">Endpoint</span>
+            <input type="text" class="form-control" aria-label="Endpoint" aria-describedby="endpoint-label" id="endpoint-input">
+            <button class="btn btn-outline-primary" type="button" id="endpoint-connect-button">Connect</button>
+          </div>
+          <div class="input-group mb-3 d-none" id="workspaces-container">
+            <span class="input-group-text" id="workspaces-label" style="width: 100px;">Workspace</span>
+            <select class="form-select" aria-describedby="workspaces-label" id="workspaces-select"></select>
+            <button type="button" class="btn btn-outline-danger" id="remove-workspace-button">
+              <span class="iconify" data-icon="mdi-trash"></span>
+            </button>
+            <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#add-workspace-modal">
+              <span class="iconify" data-icon="mdi-plus"></span>
+            </button>
+          </div>
+          <div id="active-workspace-container" class="small text-end d-none">
+            <div class="input-group mb-3">
+              <div class="input-group-text">
+                <input class="form-check-input mt-0" type="checkbox" id="skipGraphMLExport-checkbox" aria-label="Skip GraphML Export">
+              </div>
+              <div class="input-group-text flex-fill">Skip GraphML Export</div>
+              <div class="input-group-text">
+                <input class="form-check-input mt-0" type="checkbox" id="skipMetaGraphGeneration-checkbox" aria-label="Skip Meta-Graph Generation">
+              </div>
+              <div class="input-group-text flex-fill">Skip Meta-Graph Generation</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row d-none" id="dataSources-container">
+        <div class="col">
+          <table class="table table-striped small mb-4">
+            <thead>
+              <tr>
+                <th class="text-center">Active</th>
+                <th></th>
+                <th>ID</th>
+                <th class="text-center">License</th>
+                <th class="text-center">Update</th>
+                <th class="text-center">Parse</th>
+                <th class="text-center">Export</th>
+              </tr>
+            </thead>
+            <tbody id="dataSources-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="toast-body">
+        Hello, world! This is a toast message.
+        <div class="mt-2 pt-2 border-top">
+          <button type="button" class="btn btn-primary btn-sm">Take action</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="toast">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="loading-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered" style="width: 200px">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="spinner-border text-primary" style="width: 48px; height: 48px" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@iconify/iconify@3.1.1/dist/iconify.min.js"></script>
+    <script>
+      class Workspace {
+        constructor(path) {
+          this.path = path;
+          this.version = 1;
+          this.creationDateTime = null;
+          this.exists = true;
+          this.activeDataSources = [];
+          this.skipGraphMLExport = false;
+          this.skipMetaGraphGeneration = false;
+          this.globalProperties = {};
+        }
+
+        resetEditing() {
+          // TODO
+        }
+      }
+
+      class DataSourceState {
+        constructor(id) {
+          this.id = id;
+          this.availableVersion = null;
+          this.currentVersion = null;
+          this.updateDateTime = null;
+          this.updateSuccessful = false;
+          this.parseSuccessful = false;
+          this.exportSuccessful = false;
+          this.dataSourceProperties = {};
+        }
+
+        resetEditing() {
+          // TODO
+        }
+      }
+
+      class DataSource {
+        constructor(id, fullName, description, license, licenseUrl, website, developmentState, isOntology) {
+          this.id = id;
+          this.fullName = fullName;
+          this.description = description;
+          this.license = license;
+          this.licenseUrl = licenseUrl;
+          this.website = website;
+          this.developmentState = developmentState;
+          this.isOntology = isOntology;
+        }
+
+        get licenseBadge() {
+          let licenseBadge = this.license;
+          if (this.license === 'CC0 1.0') {
+            licenseBadge = '<img src="https://licensebuttons.net/l/zero/1.0/80x15.png" alt="CC0"/>';
+          } else if (this.license === 'CC BY 3.0') {
+            licenseBadge = '<img src="https://licensebuttons.net/l/by/3.0/80x15.png" alt="CC BY 3.0"/>';
+          } else if (this.license === 'CC BY 4.0') {
+            licenseBadge = '<img src="https://licensebuttons.net/l/by/4.0/80x15.png" alt="CC BY 4.0"/>';
+          } else if (this.license === 'CC BY-SA 4.0') {
+            licenseBadge = '<img src="https://licensebuttons.net/l/by-sa/4.0/80x15.png" alt="CC BY-SA 4.0"/>';
+          } else if (this.license === 'CC BY-NC 4.0') {
+            licenseBadge = '<img src="https://licensebuttons.net/l/by-nc/4.0/80x15.png" alt="CC BY-NC 4.0"/>';
+          } else if (this.license === 'CC BY-ND 4.0') {
+            licenseBadge = '<img src="https://licensebuttons.net/l/by-nd/4.0/80x15.png" alt="CC BY-ND 4.0"/>';
+          } else if (this.license === 'CC BY-NC-ND 4.0') {
+            licenseBadge = '<img src="https://licensebuttons.net/l/by-nc-nd/4.0/80x15.png" alt="CC BY-NC-ND 4.0"/>';
+          } else if (this.license === 'CC BY-NC-SA 4.0') {
+            licenseBadge = '<img src="https://licensebuttons.net/l/by-nc-sa/4.0/80x15.png" alt="CC BY-NC-SA 4.0"/>';
+          }
+          if (this.licenseUrl !== null) {
+            licenseBadge = `<a href="${this.licenseUrl}" target="_blank" rel="noopener noreferrer">${licenseBadge}</a>`;
+          }
+          return licenseBadge;
+        }
+      }
+
+      class Configurator {
+        constructor(endpoint) {
+          if (!endpoint.endsWith('/')) {
+            endpoint = endpoint + '/';
+          }
+          this.dataSourcesTablePopulated = false;
+          this.endpoint = endpoint;
+          this.dataSources = [];
+          this.workspaces = [];
+          this.activeWorkspace = null;  
+          const storagePaths = localStorage.getItem('workspaces');
+          if (storagePaths !== null) {
+            const select = document.getElementById('workspaces-select');
+            const parts = storagePaths.split(';');
+            for (let i = 0; i < parts.length; i++) {
+              if (parts.length > 0) {
+                this.workspaces.push(new Workspace(parts[i]));
+                select.innerHTML += `<option value="${parts[i]}">${parts[i]}</option>`;
+              }
+            }
+          }
+          this.updateWorkspaceSelect();
+          this.connect();
+          this.syncTimer = null;
+        }
+
+        onWorkspaceSelectChanged() {
+          const value = document.getElementById('workspaces-select').value;
+          for (let i = 0; i < this.workspaces.length; i++) {
+            if (this.workspaces[i].path === value) {
+              this.setActiveWorkspace(this.workspaces[i]);
+              this.runBlocking(new Promise(async (resolve, reject) => {
+                this.sync().then(resolve.bind(this)).catch(reject.bind(this));
+              }));
+              return;
+            }
+          }
+          this.setActiveWorkspace(null);
+        }
+
+        disconnect() {
+          if (this.syncTimer !== null) {
+            clearTimeout(this.syncTimer);
+          }
+          document.getElementById('workspaces-select').removeEventListener('change', this.onWorkspaceSelectChanged.bind(this));
+          document.getElementById('workspaces-container').classList.add('d-none');
+          document.getElementById('active-workspace-container').classList.add('d-none');
+          document.getElementById('dataSources-container').classList.add('d-none');
+        }
+
+        connect() {
+          this.runBlocking(new Promise(async (resolve, reject) => {
+            this.dataSources.splice(0, this.dataSources.length);
+            this.sendGet(this.endpoint + 'connect')
+              .then(async (response) => {
+                for (let i = 0; i < response.dataSources.length; i++) {
+                  const dataSource = response.dataSources[i];
+                  this.dataSources.push(new DataSource(
+                    dataSource.id, dataSource.fullName, dataSource.description, dataSource.license,
+                    dataSource.licenseUrl, dataSource.website, dataSource.developmentState,
+                    dataSource.isOntology
+                  ));
+                }
+                if (this.workspaces.length > 0) {
+                  this.setActiveWorkspace(this.workspaces[0]);
+                }
+                await this.sync();
+                this.syncTimer = setInterval(this.sync.bind(this), 5000);
+                document.getElementById('workspaces-container').classList.remove('d-none');
+                if (this.workspaces.length > 0) {
+                  document.getElementById('workspaces-select').value = this.workspaces[0].path;
+                }
+                document.getElementById('workspaces-select').addEventListener('change', this.onWorkspaceSelectChanged.bind(this));
+                resolve();
+              })
+              .catch((error) => reject(error));
+          }));  
+        }
+
+        runBlocking(promise) {
+          window.biodwh2LoadingModal.show();
+          promise
+            .catch(console.log)
+            .finally(() => {
+              window.biodwh2LoadingModal.hide();
+            });
+        }
+
+        async sync() {
+          return new Promise((resolve, reject) => {
+            this.sendPost(this.endpoint + 'sync', {
+              workspaces: this.workspaces.map(w => w.path),
+              activeWorkspace: this.activeWorkspace !== null ? this.activeWorkspace.path : null
+            })
+              .then((response) => {
+                for (const [key, value] of Object.entries(response.workspaces)) {
+                  for (let i = 0; i < this.workspaces.length; i++) {
+                    if (this.workspaces[i].path === key) {
+                      this.workspaces[i].exists = value;
+                    }
+                  }
+                }
+                if (this.activeWorkspace !== null && response.activeWorkspace !== null) {
+                  this.activeWorkspace.skipGraphMLExport = response.activeWorkspace.skipGraphMLExport;
+                  this.activeWorkspace.skipMetaGraphGeneration = response.activeWorkspace.skipMetaGraphGeneration;
+                  this.activeWorkspace.globalProperties = response.activeWorkspace.globalProperties;
+                }
+                this.updateWorkspaceSelect();
+                this.updateUI();
+                window.biodwh2LoadingModal.hide();
+                resolve();
+              })
+              .catch((error) => reject(error));
+          });
+        }
+
+        addWorkspace(path) {
+          for (let i = 0; i < this.workspaces.length; i++) {
+            if (this.workspaces[i].path === path) {
+              return;
+            }
+          }
+          this.runBlocking(new Promise(async (resolve, reject) => {
+            this.sendPost(this.endpoint + '/workspace/add', { path: path })
+              .then((response) => {
+                this.workspaces.push(new Workspace(path));
+                localStorage.setItem('workspaces', this.workspaces.map(w => w.path).join(';'));
+                this.sync();
+                this.setActiveWorkspace(path);
+                this.updateWorkspaceSelect();
+                document.getElementById('workspaces-select').innerHTML += `<option value="${path}">${path}</option>`;
+                resolve();
+              })
+              .catch(reject.bind(this));
+          }));
+        }
+
+        removeWorkspace(path) {
+          const select = document.getElementById('workspaces-select');
+          for (let i = this.workspaces.length - 1; i >= 0; i--) {
+            if (this.workspaces[i] === path) {
+              if (this.workspaces[i] === this.activeWorkspace) {
+                this.setActiveWorkspace(null);
+              }
+              this.workspaces.splice(i, 1);
+              select.removeChild(select.children[i]);
+
+            }
+          }
+          this.updateWorkspaceSelect();
+        }
+
+        setActiveWorkspace(workspace) {
+          if (this.activeWorkspace !== null) {
+            this.activeWorkspace.resetEditing();
+            for (let i = 0; i < this.activeWorkspace.activeDataSources.length; i++) {
+              this.activeWorkspace.activeDataSources[i].resetEditing();
+            }
+          }
+          this.activeWorkspace = workspace;
+          this.updateUI();
+        }
+
+        sendGet(url) {
+          return new Promise(async (resolve, reject) => {
+            fetch(url, {
+              method: 'GET',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+              }
+            })
+              .then((response) => resolve(response.json()))
+              .catch(reject);
+          });
+        }
+
+        sendPost(url, payload) {
+          return new Promise(async (resolve, reject) => {
+            fetch(url, {
+              method: 'POST',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(payload)
+            })
+              .then((response) => resolve(response.json()))
+              .catch(reject);
+          });
+        }
+
+        updateWorkspaceSelect() {
+          const select = document.getElementById('workspaces-select');
+          for (let i = 0; i < this.workspaces.length; i++) {
+            const workspace = this.workspaces[i];
+            select.children[i].innerHTML = `${workspace.path}`;
+          }
+          document.getElementById('remove-workspace-button').disabled = this.workspaces.length === 0;
+        }
+
+        updateUI() {
+          const activeWorkspaceContainer = document.getElementById('active-workspace-container');
+          const dataSourcesContainer = document.getElementById('dataSources-container');
+          const dataSourcesTableBody = document.getElementById('dataSources-table-body');
+          if (this.activeWorkspace !== null) {
+            activeWorkspaceContainer.classList.remove('d-none');
+            dataSourcesContainer.classList.remove('d-none');
+            if (!this.dataSourcesTablePopulated) {
+              this.dataSourcesTablePopulated = true;
+              dataSourcesTableBody.innerHTML = '';
+              for (let i = 0; i < this.dataSources.length; i++) {
+                const dataSource = this.dataSources[i];
+                dataSourcesTableBody.innerHTML += `<tr>
+                    <td class="text-center">
+                      <input class="form-check-input" type="checkbox" value="${dataSource.id}" id="dataSource-active-checkbox">
+                    </td>
+                    <td>
+                      <a title="${dataSource.isOntology ? 'Ontology' : ''}"><span class="iconify" data-icon="mdi-${dataSource.isOntology ? 'graph' : 'package-variant-closed'}" style="font-size: 24px"></span></a>
+                      <a title="${dataSource.developmentState}">
+                        ${dataSource.developmentState === 'Deprecated' ? '<span class="iconify text-danger" data-icon="mdi-delete-clock" style="font-size: 24px"></span>' : (dataSource.developmentState === 'InDevelopment' ? '<span class="iconify text-warning" data-icon="mdi-tools" style="font-size: 24px"></span>' : '')}
+                      </a>
+                    </td>
+                    <td>[${dataSource.id}]<br/>${dataSource.fullName}</td>
+                    <td>${dataSource.licenseBadge}</td>
+                    <td class="text-center"><span class="iconify text-success" data-icon="mdi-check-bold" style="font-size: 24px"></span></td>
+                    <td class="text-center"><span class="iconify text-danger" data-icon="mdi-close-thick" style="font-size: 24px"></span></td>
+                    <td class="text-center"><span class="iconify text-warning" data-icon="mdi-minus-thick" style="font-size: 24px"></span></td>
+                  </tr>`;
+              }
+            } else {
+              // TODO
+            }
+            document.getElementById('skipGraphMLExport-checkbox').checked = this.activeWorkspace.skipGraphMLExport;
+            document.getElementById('skipMetaGraphGeneration-checkbox').checked = this.activeWorkspace.skipMetaGraphGeneration;
+          } else {
+            activeWorkspaceContainer.classList.add('d-none');
+            dataSourcesContainer.classList.add('d-none');
+          }
+        }
+      }
+
+      window.addEventListener('load', async () => {
+        // TODO: test remove
+        localStorage.setItem('workspaces', 'D:\\databases\\BioDWH2_test');
+
+        const toastElList = document.querySelectorAll('.toast');
+        const toastList = [...toastElList].map(toastEl => new bootstrap.Toast(toastEl, {}));
+
+        const queryString = window.location.search;
+        const urlParams = new URLSearchParams(queryString);
+        const endpoint = urlParams.get('endpoint');
+        const endpointInput = document.getElementById('endpoint-input');
+        const endpointConnectButton = document.getElementById('endpoint-connect-button');
+
+        window.biodwh2LoadingModal = new bootstrap.Modal(document.getElementById('loading-modal'), { backdrop: 'static' });
+        window.biodwh2Configurator = null;
+
+        const connect = () => {
+          endpointConnectButton.innerHTML = 'Disconnect';
+          endpointConnectButton.classList.remove('btn-outline-primary');
+          endpointConnectButton.classList.add('btn-outline-danger');
+          window.biodwh2Configurator = new Configurator(endpointInput.value);
+        };
+
+        if (endpoint !== null && endpoint !== '') {
+          endpointInput.value = endpoint;
+          connect();
+        }
+        endpointConnectButton.addEventListener('click', async () => {
+          if (window.biodwh2Configurator !== null) {
+            window.biodwh2Configurator.disconnect();
+            window.biodwh2Configurator = null;
+            endpointConnectButton.innerHTML = 'Connect';
+            endpointConnectButton.classList.remove('btn-outline-danger');
+            endpointConnectButton.classList.add('btn-outline-primary');
+          } else {
+            connect();
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
